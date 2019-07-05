@@ -267,7 +267,7 @@ export default class BufferState {
 
         let irc = this.getNetwork().ircClient;
         let timeStr = Misc.dateIso(time);
-        irc.raw(`CHATHISTORY ${this.name} timestamp=${timeStr} message_count=${numMessages}`);
+        irc.raw(`CHATHISTORY BEFORE ${this.name} timestamp=${timeStr} ${numMessages}`);
         irc.once('batch end chathistory', (event) => {
             if (event.commands.length === 0) {
                 this.flags.chathistory_available = false;

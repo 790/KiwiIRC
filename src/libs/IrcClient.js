@@ -30,6 +30,7 @@ export function create(state, network) {
     // Current version of irc-framework only support draft/message-tags-0.2
     // TODO: Removee this once irc-framework has been updated
     ircClient.requestCap('message-tags');
+    ircClient.requestCap('chathistory');
     ircClient.use(clientMiddleware(state, network));
     ircClient.use(typingMiddleware());
 
@@ -487,6 +488,10 @@ function clientMiddleware(state, network) {
                 type: 'traffic',
                 type_extra: 'join',
             });
+            if (network.ircClient.network.supports('chathistory')) {
+                let line = `CHATHISTORY BEFORE ${buffer.name} timestamp=${Misc.dateIso()} 50`;
+                network.ircClient.raw(line);
+            }
         }
         if (command === 'kick') {
             let buffer = state.getOrAddBufferByName(networkid, event.channel);
@@ -817,7 +822,7 @@ function clientMiddleware(state, network) {
                 if (correctBuffer && numConnects > 1) {
                     buffer.requestScrollback('forward');
                 } else if (correctBuffer) {
-                    let line = `CHATHISTORY ${buffer.name} timestamp=${time} message_count=-50`;
+                    let line = `CHATHISTORY BEFORE ${buffer.name} timestamp=${time} 50`;
                     network.ircClient.raw(line);
                 }
             }
