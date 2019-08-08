@@ -144,8 +144,7 @@ Vue.directive('focus', {
 });
 
 loadApp();
-
-function loadApp() {
+async function loadApp() {
     let configFile = 'static/config.json';
     let configObj = null;
 
@@ -161,6 +160,36 @@ function loadApp() {
      */
     if (getQueryVariable('config')) {
         configFile = 'static/config_' + getQueryVariable('config') + '.json';
+    } else if (getQueryVariable('settings_preview')) {
+        let p = new Promise(async(resolve) => {
+            // Listen for messages from parent window about config changes
+            let startupOptsCheck = null;
+            window.addEventListener('message', (event) => {
+                if (event.data.previewConfig) {
+                    configObj = event.data.previewConfig;
+                    if (_.isEqual(startupOptsCheck, configObj.startupOptions) && configObj.startupScreen === state.settings.startupScreen) {
+                        // Update settings only
+                        applyConfig(configObj);
+                    } else if (vueInstance) {
+                        // Destroy & recreate the root component to reload the app with new config
+                        startupOptsCheck = { ...configObj.startupOptions };
+
+                        applyConfig(configObj);
+
+                        vueInstance.$destroy();
+                        document.body.innerHTML = '<div id="app"></div>';
+
+                        vueInstance = new Vue({
+                            el: '#app',
+                            render: h => h(App),
+                            i18n: new VueI18Next(i18next),
+                        });
+                    }
+                    resolve();
+                }
+            });
+        });
+        await p;
     } else if (typeof window.kiwiConfig === 'function') {
         try {
             configObj = window.kiwiConfig();
@@ -423,14 +452,19 @@ function initInputCommands() {
     new InputHandler(state);
 }
 
+let vueInstance = null;
+let vueReloader = 0;
 function startApp() {
     new WindowTitle(state);
 
     api.emit('init');
 
     /* eslint-disable no-new */
-    new Vue({
+    vueInstance = new Vue({
         el: '#app',
+        data: {
+            key: vueReloader,
+        },
         render: h => h(App),
         i18n: new VueI18Next(i18next),
     });
@@ -446,7 +480,7 @@ function showError(err) {
     }
 
     /* eslint-disable no-new */
-    new Vue({
+    vueInstance = new Vue({
         el: '#app',
         render: h => h(
             StartupError,
